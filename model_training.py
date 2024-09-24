@@ -9,6 +9,37 @@ import torch.optim as optim
 from torch.utils.data import DataLoader, TensorDataset
 import matplotlib.pyplot as plt
 from sklearn.metrics import mean_absolute_error, r2_score
+from sklearn.model_selection import GridSearchCV
+
+class LSTMWrapper:
+    def __init__(self, n_timesteps, n_features, lstm_units=50, learning_rate=0.001):
+        self.model = LSTMModel(n_timesteps=n_timesteps, n_features=n_features, lstm_units=lstm_units)
+        self.criterion = nn.MSELoss()
+        self.optimizer = optim.Adam(self.model.parameters(), lr=learning_rate)
+    
+    def train(self, X_train, y_train, batch_size, epochs):
+        train_data = TensorDataset(torch.tensor(X_train, dtype=torch.float32), torch.tensor(y_train, dtype=torch.float32))
+        train_loader = DataLoader(train_data, batch_size=batch_size, shuffle=True)
+        
+        for epoch in range(epochs):
+            self.model.train()
+            running_loss = 0.0
+            for X_batch, y_batch in train_loader:
+                self.optimizer.zero_grad()
+                outputs = self.model(X_batch)
+                loss = self.criterion(outputs, y_batch.unsqueeze(1))
+                loss.backward()
+                self.optimizer.step()
+                running_loss += loss.item()
+        return running_loss / len(train_loader)
+
+    def evaluate(self, X_test, y_test):
+        self.model.eval()
+        X_test = torch.tensor(X_test, dtype=torch.float32)
+        y_test = torch.tensor(y_test, dtype=torch.float32)
+        with torch.no_grad():
+            outputs = self.model(X_test)
+        return outputs
 
 # Define the LSTM model
 class LSTMModel(nn.Module):

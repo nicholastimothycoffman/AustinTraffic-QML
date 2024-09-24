@@ -6,7 +6,8 @@
 import torch
 import matplotlib.pyplot as plt
 from data_processing import load_austin_data, fetch_google_traffic_data, fetch_tomtom_traffic_data, merge_datasets, handle_missing_values, create_time_series, normalize_data
-from model_training import LSTMModel, train_model, evaluate_model
+from model_training import LSTMModel, train_model, evaluate_model, LSTMWrapper
+from hyperparameter_tuning import hyperparameter_tuning, param_grid
 from quantum_optimization import grover_search
 from sklearn.model_selection import train_test_split
 
@@ -41,10 +42,24 @@ X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_
 # Normalize the data
 X_train_scaled, X_test_scaled, y_train_scaled, y_test_scaled, scaler_X, scaler_y = normalize_data(X_train, X_test, y_train, y_test)
 
-# Build the LSTM model with early stopping
+# Build the LSTM model with different hyperparameters
 n_timesteps = X_train_scaled.shape[1]
 n_features = X_train_scaled.shape[2]
+
+# You can modify the number of LSTM units here
 model = LSTMModel(n_timesteps=n_timesteps, n_features=n_features)
+
+# Tune the learning rate and batch size
+model = train_model(
+    model,
+    X_train_scaled,
+    y_train_scaled,
+    X_test_scaled,
+    y_test_scaled,
+    epochs=50,      # Experiment with epochs
+    batch_size=32,  # Experiment with batch size (e.g., 32, 64, 128)
+    patience=5      # Keep early stopping for overfitting prevention
+)
 
 # Train the model with early stopping
 model = train_model(model, X_train_scaled, y_train_scaled, X_test_scaled, y_test_scaled, epochs=50, batch_size=64, patience=5)
@@ -70,6 +85,13 @@ plot_predictions(y_test_original, y_pred_original)
 
 # Save the trained model
 torch.save(model.state_dict(), 'lstm_model.pth')
+
+# Perform hyperparameter tuning
+best_params = hyperparameter_tuning(X_train_scaled, y_train_scaled, X_test_scaled, y_test_scaled, param_grid)
+
+# Use the best hyperparameters to train your model
+best_model = LSTMWrapper(n_timesteps=X_train_scaled.shape[1], n_features=X_train_scaled.shape[2], lstm_units=best_params['lstm_units'], learning_rate=best_params['learning_rate'])
+best_model.train(X_train_scaled, y_train_scaled, batch_size=best_params['batch_size'], epochs=best_params['epochs'])
 
 # Quantum-enhanced hyperparameter tuning
 # Define oracle for Grover's search (implement your oracle logic)
