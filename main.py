@@ -8,7 +8,8 @@ import matplotlib.pyplot as plt
 from data_processing import load_austin_data, fetch_google_traffic_data, fetch_tomtom_traffic_data, merge_datasets, handle_missing_values, create_time_series, normalize_data
 from model_training import LSTMModel, train_model, evaluate_model, LSTMWrapper
 from hyperparameter_tuning import hyperparameter_tuning, param_grid
-from quantum_optimization import grover_search
+from quantum_optimization import grover_algorithm_with_sv
+from qiskit.visualization import plot_histogram
 from sklearn.model_selection import train_test_split
 
 # Function to plot predictions
@@ -121,8 +122,14 @@ y_test_original = scaler_y.inverse_transform(y_test_scaled)
 # Call the visualization function
 plot_predictions(y_test_original, y_pred_original)
 
-# Quantum-enhanced hyperparameter tuning
-# Define oracle for Grover's search (implement your oracle logic)
-oracle = ...
-optimal_params = grover_search(oracle, num_qubits=4)
-print(f'Optimal Hyperparameters: {optimal_params}')
+# Define the number of qubits and marked states
+num_qubits = 3
+marked_states = ["011", "100"] # These are binary-encoded representations of hyperparameter sets
+M = 5 # Number of computational basis states
+
+# Run Grover's algorithm with Shukla-Vedula superposition
+result = grover_algorithm_with_sv(num_qubits, marked_states, M)
+
+# Visualize the results
+plot_histogram(result.get_counts())
+
