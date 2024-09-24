@@ -89,9 +89,37 @@ torch.save(model.state_dict(), 'lstm_model.pth')
 # Perform hyperparameter tuning
 best_params = hyperparameter_tuning(X_train_scaled, y_train_scaled, X_test_scaled, y_test_scaled, param_grid)
 
+# Now use the best hyperparameters to train the final model
+print(f'Best Hyperparameters: {best_params}')
+
 # Use the best hyperparameters to train your model
-best_model = LSTMWrapper(n_timesteps=X_train_scaled.shape[1], n_features=X_train_scaled.shape[2], lstm_units=best_params['lstm_units'], learning_rate=best_params['learning_rate'])
-best_model.train(X_train_scaled, y_train_scaled, batch_size=best_params['batch_size'], epochs=best_params['epochs'])
+best_model = LSTMWrapper(
+    n_timesteps=X_train_scaled.shape[1], 
+    n_features=X_train_scaled.shape[2], 
+    lstm_units=best_params['lstm_units'], 
+    learning_rate=best_params['learning_rate']
+    )
+
+best_model.train(
+    X_train_scaled, 
+    y_train_scaled, 
+    batch_size=best_params['batch_size'], 
+    epochs=best_params['epochs']
+    )
+
+# Evaluate the best model on the test data
+test_loss, mae, r2 = evaluate_model(best_model.model, X_test_scaled, y_test_scaled, scaler_y=scaler_y)
+print(f"Best Model Test Loss (MSE): {test_loss}")
+print(f"Mean Absolute Error (MAE): {mae}")
+print(f"R² Score: {r2}")
+
+# Visualize the results (actual vs predicted values)
+y_pred_scaled = best_model.model(torch.tensor(X_test_scaled, dtype=torch.float32)).detach().numpy()
+y_pred_original = scaler_y.inverse_transform(y_pred_scaled)
+y_test_original = scaler_y.inverse_transform(y_test_scaled)
+
+# Call the visualization function
+plot_predictions(y_test_original, y_pred_original)
 
 # Quantum-enhanced hyperparameter tuning
 # Define oracle for Grover's search (implement your oracle logic)
