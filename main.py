@@ -3,9 +3,11 @@
 # the other modules: preprocessing data, training the model, and
 # performing quantum optimization.
 
-from data_preprocessing import load_austin_data, fetch_google_traffic_data, fetch_tomtom_traffic_data, merge_datasets, create_time_series
-from model_training import build_model, train_model, evaluate_model
+import torch
+from data_processing import load_austin_data, fetch_google_traffic_data, fetch_tomtom_traffic_data, merge_datasets, handle_missing_values, create_time_series, normalize_data
+from model_training import LSTMModel, train_model, evaluate_model
 from quantum_optimization import grover_search
+from sklearn.model_selection import train_test_split
 
 # Load and preprocess data
 austin_data = load_austin_data('austin_traffic_counts.csv')
@@ -13,17 +15,33 @@ google_data = fetch_google_traffic_data('google_api_url', 'your_google_api_key')
 tomtom_data = fetch_tomtom_traffic_data('tomtom_api_url', 'your_tomtom_api_key')
 
 combined_data = merge_datasets(austin_data, google_data, tomtom_data)
-X, y = create_time_series(combined_data)
 
-# Split data into train and test sets (implement split logic)
-X_train, X_test, y_train, y_test = ..., ..., ..., ...
+# Handle any missing values in the combined dataset
+cleaned_data = handle_missing_values(combined_data)
 
-# Build and train the model
-model = build_model(n_timesteps=X_train.shape[1], n_features=X_train.shape[2])
-model = train_model(model, X_train, y_train, X_test, y_test)
+# Create time_series data
+X, y = create_time_series(cleaned_data, n_timesteps=10)
 
-# Evaluate the model
-evaluate_model(model, X_test, y_test)
+# Split data into train and test sets (80/20 split)
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+# Normalize the data
+X_train_scaled, X_test_scaled, y_train_scaled, y_test_scaled, scaler_X, scaler_y = normalize_data(X_train, X_test, y_train, y_test)
+
+# Build the LSTM model
+n_timesteps = X_train_scaled.shape[1]
+n_features = X_train_scaled.shape[2]
+model = LSTMModel(n_timesteps=n_timesteps, n_features=n_features)
+
+# Train the model
+model = train_model(model, X_train_scaled, y_train_scaled, X_test_scaled, y_test_scaled, epochs=10, batch_size=64)
+
+# Evaluate the model on the test set
+test_loss = evaluate_model(model, X_test_scaled, y_test_scaled)
+print(f"Test Loss (MSE): {test_loss}")
+
+# Save the trained model
+torch.save(model.state_dict(), 'lstm_model.pth')
 
 # Quantum-enhanced hyperparameter tuning
 # Define oracle for Grover's search (implement your oracle logic)
