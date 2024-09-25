@@ -3,11 +3,15 @@
 # and the Shukla-Vedula algorithm. 
 
 import math
-from qiskit import QuantumCircuit, transpile
+from qiskit import QuantumCircuit, transpile, IBMQ
 from qiskit_aer import AerSimulator
 from qiskit.circuit.library import GroverOperator, MCMT
-from qiskit.circuit.library.data_preparation import UniformSuperspositionGate
+from qiskit.circuit.library.data_preparation import UniformSuperpositionGate
 from qiskit.visualization import plot_histogram
+from qiskit.providers import Backend as backend
+from qiskit.providers import least_busy
+from braket.circuits import Circuit as BraketCircuit
+from braket.aws import AwsDevice
 
 
 def grover_oracle(marked_states, num_qubits):
@@ -59,14 +63,15 @@ def diffusion_operator(qc, qubits):
     qc.h(qubits)  # Apply Hadamard gates again
 
 
-def grover_algorithm_with_sv(num_qubits, marked_states, M):
+def grover_algorithm_with_sv(num_qubits, marked_states, M, backend_choice="local"):
     """
     Runs Grover's algorithm using Shukla-Vedula uniform superposition.
 
     Parameters:
-    num_qubits: Number of qubits in the quantum circuit
-    marked_states: List of binary strings representing the states to mark
-    M: Number of computational basis states
+    - num_qubits: Number of qubits in the quantum circuit
+    - marked_states: List of binary strings representing the states to mark
+    - M: Number of computational basis states
+    - backend_choice: Choose between 'local', 'ibmq', or 'aws' (default is 'local')
 
     Returns:
     Results of the quantum circuit execution
@@ -75,7 +80,7 @@ def grover_algorithm_with_sv(num_qubits, marked_states, M):
     qc = QuantumCircuit(num_qubits)
 
     # Apply the UniformSuperpositionGate from Shukla-Vedula algorithm
-    usp_gate = UniformSuperspositionGate(M, num_qubits)
+    usp_gate = UniformSuperpositionGate(M, num_qubits)
     qc.append(usp_gate, list(range(num_qubits)))
 
     # Create and append the oracle circuit
@@ -93,9 +98,44 @@ def grover_algorithm_with_sv(num_qubits, marked_states, M):
     # Add measurements
     qc.measure_all()
     
-    # Set up the simulator and run the circuit
-    simulator = AerSimulator()
-    transpiled_circuit = transpile(qc, simulator)
-    result = simulator.run(transpiled_circuit, shots=1024).result()
+    # Backend choice
+    if backend_choice == "local":
+        # Set up the simulator and run the circuit
+        simulator = AerSimulator()
+        transpiled_circuit = transpile(qc, simulator)
+        result = simulator.run(transpiled_circuit, shots=1024).result()
+
+    elif backend_choice == "ibmq":
+        # IBM Quantum backend
+        IBMQ.load_account()
+        provider = IBMQ.get_provider(hub='ibm-q')
+        backend = least_busy(provider.backends(filters=lambda x: x.configuration().n_qubits >= num_qubits and
+                                               not x.configuration().simulator and
+                                               x.status().operational==True))
+    
+    elif backend_choice == "aws":
+        # AWS Braket backend (example with Rigetti QPU)
+        device = AwsDevice("arn:aws:braket:::device/qpu/rigetti/Aspen-9")
+        braket_circuit = qiskit_to_braket_conversion(qc) # Conversion may be needed
+        task = device.run(braket_circuit, shots=1024)
+        result = task.result()
+
+    else:
+        raise ValueError("Invalid backend choice. Choose 'local', 'ibmq', or 'aws'.")
     
     return result
+
+# Example of Qiskit to Braket conersion helper (very basic)
+def qiskit_to_braket_conversion(qiskit_circuit):
+    # Convert Qiskit quantum gates to Braket format
+    braket_circuit = BraketCircuit()
+
+    # Loop over instructions in Qiskit circuit and map them to Braket
+    for instr in qiskit_circuit:
+        if instr.name == 'h':
+            braket_circuit.h(instr.qubits[0].index)
+        elif instr.name == 'x':
+            braket_circuit.x(instr.qubits[0].index)
+        # Add more mappings as needed
+
+    return braket_circuit
