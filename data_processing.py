@@ -27,6 +27,10 @@ def load_austin_data(filepath):
         print(f"An error occured: {e}")
         return None
     
+    # Example usage
+    austin_data = load_austin_data('Travel_Sensors_20240925.csv')
+    print(ausitn_data.head())
+    
 def fetch_google_traffic_data(api_url, api_key):
     try:
         response = requests.get(f"{api_url}?key={api_key}")
