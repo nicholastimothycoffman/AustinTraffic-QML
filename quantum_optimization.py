@@ -3,13 +3,13 @@
 # and the Shukla-Vedula algorithm. 
 
 import math
-from qiskit import QuantumCircuit, transpile, IBMQ
+from qiskit import QuantumCircuit, transpile
 from qiskit_aer import AerSimulator
 from qiskit.circuit.library import GroverOperator, MCMT
 from qiskit.circuit.library.data_preparation import UniformSuperpositionGate
 from qiskit.visualization import plot_histogram
 from qiskit.providers import Backend as backend
-from qiskit.providers import least_busy
+from qiskit_ibm_runtime import QiskitRuntimeService
 from braket.circuits import Circuit as BraketCircuit
 from braket.aws import AwsDevice
 
@@ -107,11 +107,10 @@ def grover_algorithm_with_sv(num_qubits, marked_states, M, backend_choice="local
 
     elif backend_choice == "ibmq":
         # IBM Quantum backend
-        IBMQ.load_account()
-        provider = IBMQ.get_provider(hub='ibm-q')
-        backend = least_busy(provider.backends(filters=lambda x: x.configuration().n_qubits >= num_qubits and
-                                               not x.configuration().simulator and
-                                               x.status().operational==True))
+        service = QiskitRuntimeService(channel="ibm_quantum", # ibm_cloud
+                                       token=fe4ddaafa1a6629cfbaa58ef8fab7db93bcc43ebaff9aaa4c512861650ab1773122251b25915881bdeb1cc9f7e1afc5dbecf3a265067056346f9bb5f438908b7)
+
+        backend = service.backend(name = "ibm_brisbane")
     
     elif backend_choice == "aws":
         # AWS Braket backend (example with Rigetti QPU)
