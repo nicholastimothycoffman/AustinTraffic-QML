@@ -127,8 +127,11 @@ num_qubits = 3
 marked_states = ["011", "100"] # These are binary-encoded representations of hyperparameter sets
 M = 5 # Number of computational basis states
 
+# Choose the backend
+backend_choice = input("Choose backend: 'local', 'ibmq', or 'aws': ").strip().lower()
+
 # Run Grover's algorithm with Shukla-Vedula superposition
-result = grover_algorithm_with_sv(num_qubits, marked_states, M)
+result = grover_algorithm_with_sv(num_qubits, marked_states, M, backend_choice)
 
 # Visualize the results
 plot_histogram(result.get_counts())
