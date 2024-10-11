@@ -8,6 +8,123 @@ import requests
 import numpy as np
 from sklearn.preprocessing import MinMaxScaler
 
+def load_and_validate_data(filepath):
+    try:
+        # Load the CSV file
+        data = pd.read_csv(filepath)
+        
+        # Validate that important columns exist
+        required_columns = ['timestamp', 'location', 'traffic_volume', 'speed', 'occupancy']
+        for column in required_columns:
+            if column not in data.columns:
+                raise ValueError(f"Missing required column: {column}")
+
+        # Check for duplicate rows
+        if data.duplicated().sum() > 0:
+            data.drop_duplicates(inplace=True)
+
+        # Validate timestamps are in proper format
+        data['timestamp'] = pd.to_datetime(data['timestamp'], errors='coerce')
+        if data['timestamp'].isna().sum() > 0:
+            raise ValueError("Invalid or missing timestamps found.")
+        
+        # Forward-fill for missing values
+        data.fillna(method='ffill', inplace=True)
+
+        # Drop rows that still have missing values
+        data.dropna(inplace=True)
+        
+        # Return cleaned and validated data
+        return data
+
+    except FileNotFoundError:
+        print(f"Error: File {filepath} not found.")
+        return None
+    except pd.errors.EmptyDataError:
+        print(f"Error: File {filepath} is empty.")
+        return None
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        return None
+
+def detect_outliers(data, column_name):
+    """
+    Detect outliers using the IQR method and remove them.
+    
+    Parameters:
+    - data: DataFrame containing the data
+    - column_name: Name of the column to check for outliers
+    
+    Returns:
+    - DataFrame with outliers removed
+    """
+    Q1 = data[column_name].quantile(0.25)
+    Q3 = data[column_name].quantile(0.75)
+    IQR = Q3 - Q1
+
+    # Define outlier boundaries
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+
+    # Filter out outliers
+    data = data[(data[column_name] >= lower_bound) & (data[column_name] <= upper_bound)]
+    return data
+
+def engineer_features(data):
+    """
+    Engineer new features from the timestamp.
+    
+    Parameters:
+    - data: DataFrame containing the data
+    
+    Returns:
+    - DataFrame with new features added
+    """
+    data['day_of_week'] = data['timestamp'].dt.dayofweek  # Day of the week (0 = Monday, 6 = Sunday)
+    data['hour_of_day'] = data['timestamp'].dt.hour  # Hour of the day (0-23)
+    data['is_weekend'] = data['day_of_week'].apply(lambda x: 1 if x >= 5 else 0)  # Is weekend?
+    
+    # Example: Adding a holiday feature (assuming a holidays list or API exists)
+    # holidays = ['2024-01-01', '2024-12-25']  # Sample holidays
+    # data['is_holiday'] = data['timestamp'].dt.date.isin(holidays).astype(int)
+    
+    return data
+
+def preprocess_and_scale_data(data):
+    """
+    Preprocess data by handling missing values, normalizing, and scaling features.
+    
+    Parameters:
+    - data: DataFrame containing the data
+    
+    Returns:
+    - Scaled data and the scaler object
+    """
+    # Handle missing values with interpolation for numeric columns
+    data.interpolate(method='linear', inplace=True)
+
+    # Feature scaling
+    scaler = MinMaxScaler()
+    scaled_data = scaler.fit_transform(data.drop(columns=['timestamp', 'location']))
+    
+    return scaled_data, scaler
+
+# Example usage
+filepath = 'Travel_Sensors_20240925.csv'
+austin_data = load_and_validate_data(filepath)
+
+if austin_data is not None:
+    # Detect and remove outliers in traffic volume and speed
+    austin_data = detect_outliers(austin_data, 'traffic_volume')
+    austin_data = detect_outliers(austin_data, 'speed')
+
+    # Add new engineered features like day of the week, hour of the day, etc.
+    austin_data = engineer_features(austin_data)
+
+    # Preprocess and scale the data
+    scaled_data, scaler = preprocess_and_scale_data(austin_data)
+    print(f"Scaled Data: {scaled_data[:5]}")
+
 def load_austin_data(filepath):
     try:
         # Load Austin traffic data from CSV
